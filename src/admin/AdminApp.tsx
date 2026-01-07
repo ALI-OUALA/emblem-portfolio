@@ -81,6 +81,7 @@ function Login({ onSuccess }: { onSuccess: (user: User) => void }) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
             type="email"
+            autoComplete="email"
             required
           />
           <input
@@ -89,6 +90,7 @@ function Login({ onSuccess }: { onSuccess: (user: User) => void }) {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             type="password"
+            autoComplete="current-password"
             required
           />
           {error ? <p className="text-xs text-soft">{error}</p> : null}

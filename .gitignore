@@ -4,4 +4,7 @@ dist/
 .vite/
 .env
 .env.*
+.env.local
+server/.env
+DEPLOYMENT_GUIDE.local.md
 .DS_Store

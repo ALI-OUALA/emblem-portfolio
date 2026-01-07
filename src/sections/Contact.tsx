@@ -3,15 +3,38 @@ import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/Section';
 import { PrimaryButton } from '@/components/ui/button';
+import { apiFetch, API_BASE } from '@/lib/api';
 
-export function Contact() {
+type ContactProps = {
+  title: string;
+  subtitle: string;
+  notes: string[];
+  email: string;
+};
+
+export function Contact({ title, subtitle, notes, email }: ContactProps) {
   const [form, setForm] = useState({ name: '', email: '', company: '', message: '' });
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('New inquiry:', form);
-    alert('Thanks — we will get back to you shortly.');
-    setForm({ name: '', email: '', company: '', message: '' });
+    setStatus('loading');
+    try {
+      if (!API_BASE) {
+        setStatus('success');
+        setForm({ name: '', email: '', company: '', message: '' });
+        return;
+      }
+      await apiFetch('/api/public/inquiries', {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      setStatus('success');
+      setForm({ name: '', email: '', company: '', message: '' });
+    } catch (err) {
+      console.error(err);
+      setStatus('error');
+    }
   };
 
   return (
@@ -20,21 +43,18 @@ export function Contact() {
         <div className="grid gap-6 md:grid-cols-2 mb-12">
           <div className="stack-sm">
             <SectionHeading>Let&apos;s talk</SectionHeading>
-            <p className="font-display text-title text-ink">
-              Tell us what you are building and where the friction is.
-            </p>
+            <p className="font-display text-title text-ink">{title}</p>
             <div className="stack-sm text-sm text-muted">
-              <p>
-                A single doc, a rough prototype, or a brand that needs sharper product work —
-                that is enough to start.
-              </p>
-              <p>We respond within 48 hours with next steps and a clear schedule.</p>
+              <p>{subtitle}</p>
+              {notes.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
             </div>
           </div>
           <div className="stack-sm text-sm text-muted">
             <p className="text-label text-ink">Direct email</p>
-            <a href="mailto:hello@emblem.studio" className="font-mono text-ink">
-              hello@emblem.studio
+            <a href={`mailto:${email}`} className="font-mono text-ink">
+              {email}
             </a>
             <div className="stack-sm text-xs text-soft">
               <p>Preferred start windows: May – July 2026</p>
@@ -84,7 +104,11 @@ export function Contact() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <PrimaryButton type="submit">Send message</PrimaryButton>
             <p className="text-xs text-soft">
-              No newsletters, no automated follow-ups — just a reply from the studio.
+              {status === 'success'
+                ? 'Thanks — we will get back to you shortly.'
+                : status === 'error'
+                  ? 'Something went wrong. Please try again or email us.'
+                  : 'No newsletters, no automated follow-ups — just a reply from the studio.'}
             </p>
           </div>
         </motion.form>

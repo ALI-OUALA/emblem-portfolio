@@ -1,21 +1,14 @@
-import { Hero } from './sections/Hero';
-import { Services } from './sections/Services';
-import { Work } from './sections/Work';
-import { Contact } from './sections/Contact';
-import { Footer } from './sections/Footer';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { SiteHome } from './site/SiteHome';
+import { AdminApp } from './admin/AdminApp';
 
 export default function App() {
-  const scrollToContact = () => {
-    document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
-    <div className="min-h-screen bg-paper text-ink">
-      <Hero onCta={scrollToContact} />
-      <Services />
-      <Work />
-      <Contact />
-      <Footer />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<SiteHome />} />
+        <Route path="/admin/*" element={<AdminApp />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

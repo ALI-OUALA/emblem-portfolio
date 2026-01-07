@@ -3,40 +3,14 @@ import { Container } from '@/components/ui/Container';
 import { SectionHeading, Card } from '@/components/ui/Section';
 import { motion } from 'framer-motion';
 
-export function Services() {
-  const items = [
-    {
-      title: 'Brand Systems',
-      desc: 'Names, identities, and art direction that translate into real assets and usable templates.',
-      meta: 'Identity',
-    },
-    {
-      title: 'Launch & Marketing Sites',
-      desc: 'High-contrast sites for new products, waitlists, and sharp announcements with real conversions.',
-      meta: 'Web',
-    },
-    {
-      title: 'Product UX',
-      desc: 'Design language, UI flows, and dashboard UI that scales without losing character.',
-      meta: 'Product',
-    },
-    {
-      title: 'Design Systems',
-      desc: 'Tokens, components, and patterns that keep every new screen on-brand and consistent.',
-      meta: 'Systems',
-    },
-    {
-      title: 'Studio Retainers',
-      desc: 'Monthly design and dev support for teams who want a small, focused partner.',
-      meta: 'Support',
-    },
-    {
-      title: 'Creative Direction',
-      desc: 'Visual strategy and art direction for teams working with AI or rapid content pipelines.',
-      meta: 'Direction',
-    },
-  ];
+type ServiceItem = {
+  id: number | string;
+  title: string;
+  desc: string;
+  meta: string;
+};
 
+export function Services({ items }: { items: ServiceItem[] }) {
   return (
     <section id="services" className="py-12 md:py-32 border-b-2 border-ink bg-paper-strong">
       <Container>
@@ -62,8 +36,8 @@ export function Services() {
           variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {items.map(({ title, desc, meta }, i) => (
-            <Card key={title} delay={i * 0.05} className="stack-sm">
+          {items.map(({ id, title, desc, meta }, i) => (
+            <Card key={id} delay={i * 0.05} className="stack-sm">
               <p className="text-label text-ink">{meta}</p>
               <h3 className="font-display text-base text-ink">{title}</h3>
               <p className="text-sm text-muted">{desc}</p>

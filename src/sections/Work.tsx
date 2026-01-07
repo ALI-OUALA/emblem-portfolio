@@ -3,53 +3,16 @@ import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/Section';
 
-const projects = [
-  {
-    title: 'Fieldnote',
-    role: 'Identity, marketing site, product UI',
-    summary:
-      'Concept: a minimal interface for research teams to collect and share findings without the usual noise.',
-    year: '2024',
-    focus: 'Research',
-  },
-  {
-    title: 'Northline Studio',
-    role: 'Art direction, portfolio experience',
-    summary: 'Study: editorial layout for an architecture studio crossing physical and digital spaces.',
-    year: '2023',
-    focus: 'Editorial',
-  },
-  {
-    title: 'Sora Analytics',
-    role: 'Dashboard UI, design system',
-    summary: 'Concept: fast, legible dashboards that help growth teams make daily calls quickly.',
-    year: '2023',
-    focus: 'Data',
-  },
-  {
-    title: 'Linea',
-    role: 'Brand refresh, product marketing',
-    summary: 'Exploration: a refined logotype, palette, and landing page system for a productivity tool.',
-    year: '2022',
-    focus: 'Brand',
-  },
-  {
-    title: 'Atlas Health',
-    role: 'Product UI, onboarding flows',
-    summary: 'Concept: simplified onboarding and care plans for a digital health platform.',
-    year: '2022',
-    focus: 'Health',
-  },
-  {
-    title: 'Quiet Supply',
-    role: 'Identity, ecommerce experience',
-    summary: 'Study: a restrained identity and shopping journey for a small-batch home goods label.',
-    year: '2021',
-    focus: 'Commerce',
-  },
-];
+type ProjectItem = {
+  id: number | string;
+  title: string;
+  role: string;
+  summary: string;
+  year: string;
+  focus: string;
+};
 
-export function Work() {
+export function Work({ projects }: { projects: ProjectItem[] }) {
   return (
     <section id="work" className="py-12 md:py-32 border-b-2 border-ink bg-paper">
       <Container>
@@ -71,7 +34,7 @@ export function Work() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project, i) => (
             <motion.button
-              key={project.title}
+              key={project.id}
               type="button"
               onClick={() =>
                 document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth', block: 'start' })

@@ -3,7 +3,16 @@ import { Instagram, Linkedin, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 
-export function Footer() {
+type FooterProps = {
+  footerBlurb: string;
+  email: string;
+  socials: {
+    linkedin: string;
+    instagram: string;
+  };
+};
+
+export function Footer({ footerBlurb, email, socials }: FooterProps) {
   const year = new Date().getFullYear();
 
   return (
@@ -16,19 +25,19 @@ export function Footer() {
           transition={{ duration: 0.4 }}
           className="text-xs font-mono text-soft"
         >
-          © {year} Emblém studio · design and dev studio · open for new projects.
+          © {year} {footerBlurb}
         </motion.p>
         <div className="flex flex-wrap items-center gap-4 text-soft">
           <a
-            href="mailto:hello@emblem.studio"
+            href={`mailto:${email}`}
             aria-label="Email"
             className="hover-ink flex items-center gap-2 text-sm"
           >
             <Mail size={18} />
-            <span>hello@emblem.studio</span>
+            <span>{email}</span>
           </a>
           <a
-            href="https://www.linkedin.com"
+            href={socials.linkedin}
             target="_blank"
             rel="noreferrer"
             aria-label="LinkedIn"
@@ -37,7 +46,7 @@ export function Footer() {
             <Linkedin size={18} />
           </a>
           <a
-            href="https://www.instagram.com"
+            href={socials.instagram}
             target="_blank"
             rel="noreferrer"
             aria-label="Instagram"

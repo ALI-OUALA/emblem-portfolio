@@ -1,11 +1,18 @@
+# Emblém Portfolio
+Editorial-grade portfolio with a custom CMS dashboard.
 
-  # Cinematic Landing Page Design
+## Frontend (Vite + React)
+Run `npm i` to install dependencies.  
+Run `npm run dev` to start the frontend at `http://localhost:3000`.
 
-  This is a code bundle for Cinematic Landing Page Design. The original project is available at https://www.figma.com/design/690jVzHCAgjp1twuSgwvmq/Cinematic-Landing-Page-Design.
+## Backend (Node + Express)
+The API and CMS live in `server/`.
 
-  ## Running the code
+```
+cd server
+npm i
+cp .env.example .env
+npm run dev
+```
 
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
+The admin dashboard is available at `/admin`.

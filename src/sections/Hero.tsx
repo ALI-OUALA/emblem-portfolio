@@ -3,7 +3,15 @@ import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { PrimaryButton, GhostButton } from '@/components/ui/button';
 
-export function Hero({ onCta }: { onCta: () => void }) {
+type HeroProps = {
+  onCta: () => void;
+  badge: string;
+  title: string;
+  subtitle: string;
+  notes: string[];
+};
+
+export function Hero({ onCta, badge, title, subtitle, notes }: HeroProps) {
   return (
     <header className="bg-paper border-b-2 border-ink">
       <Container className="py-6">
@@ -34,14 +42,9 @@ export function Hero({ onCta }: { onCta: () => void }) {
           className="grid gap-8 md:grid-cols-2"
         >
           <div className="stack-lg">
-            <span className="badge">Booking Q2 2026 · 2–6 week sprints</span>
-            <h1 className="font-display text-hero text-ink">
-              Editorial-grade digital experiences for teams who demand clarity and edge.
-            </h1>
-            <p className="text-lead text-muted max-w-3xl">
-              Emblém is a small studio blending identity, product UX, and front-end build.
-              We ship sharp systems that stay minimal, fast, and unmistakably yours.
-            </p>
+            <span className="badge">{badge}</span>
+            <h1 className="font-display text-hero text-ink">{title}</h1>
+            <p className="text-lead text-muted max-w-3xl">{subtitle}</p>
             <div className="flex flex-wrap items-center gap-3">
               <PrimaryButton onClick={onCta}>Start a project</PrimaryButton>
               <GhostButton
@@ -56,9 +59,9 @@ export function Hero({ onCta }: { onCta: () => void }) {
               </GhostButton>
             </div>
             <div className="flex flex-wrap gap-6 text-xs font-mono text-soft">
-              <span>Remote · UTC+1</span>
-              <span>Design + development</span>
-              <span>Built for launch speed</span>
+              {notes.map((note) => (
+                <span key={note}>{note}</span>
+              ))}
             </div>
           </div>
           <div className="grid gap-4">

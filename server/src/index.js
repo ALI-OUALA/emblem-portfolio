@@ -6,6 +6,7 @@ import cors from "cors";
 import bcrypt from "bcryptjs";
 import cookie from "cookie";
 import dotenv from "dotenv";
+import multer from "multer";
 import pg from "pg";
 
 dotenv.config();
@@ -22,6 +23,7 @@ const {
   CORS_ORIGIN = "http://localhost:3000",
   NODE_ENV = "development",
   COOKIE_SECURE = "false",
+  UPLOAD_DIR = "uploads",
 } = process.env;
 
 const ssl =
@@ -36,6 +38,23 @@ const pool = new Pool({
   ssl,
 });
 
+const uploadRoot = path.join(process.cwd(), UPLOAD_DIR);
+fs.mkdirSync(uploadRoot, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadRoot);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const name = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`;
+      cb(null, name);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 app.use(
@@ -44,6 +63,7 @@ app.use(
     credentials: true,
   })
 );
+app.use("/uploads", express.static(uploadRoot));
 
 const cookieIsSecure = COOKIE_SECURE === "true" || NODE_ENV === "production";
 
@@ -346,11 +366,18 @@ app.get("/api/admin/content", requireAuth(), async (req, res) => {
   const inquiries = await pool.query(
     "select id, name, email, company, message, created_at from inquiries order by created_at desc limit 50"
   );
+  const media = await pool.query(
+    "select id, filename, original_name, mime, size, created_at from media order by created_at desc limit 100"
+  );
   res.json({
     settings: settings.rows[0]?.data || defaultSettings,
     services: services.rows,
     projects: projects.rows,
     inquiries: inquiries.rows,
+    media: media.rows.map((item) => ({
+      ...item,
+      url: `/uploads/${item.filename}`,
+    })),
   });
 });
 
@@ -424,6 +451,48 @@ app.get("/api/admin/inquiries", requireAuth(), async (req, res) => {
     "select id, name, email, company, message, created_at from inquiries order by created_at desc limit 100"
   );
   res.json({ inquiries: inquiries.rows });
+});
+
+app.get("/api/admin/media", requireAuth(), async (req, res) => {
+  const media = await pool.query(
+    "select id, filename, original_name, mime, size, created_at from media order by created_at desc limit 200"
+  );
+  res.json({
+    media: media.rows.map((item) => ({
+      ...item,
+      url: `/uploads/${item.filename}`,
+    })),
+  });
+});
+
+app.post("/api/admin/media", requireAuth(), upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  const { filename, originalname, mimetype, size } = req.file;
+  const result = await pool.query(
+    "insert into media (filename, original_name, mime, size) values ($1, $2, $3, $4) returning id, filename, original_name, mime, size, created_at",
+    [filename, originalname, mimetype, size]
+  );
+  const item = result.rows[0];
+  res.status(201).json({ media: { ...item, url: `/uploads/${item.filename}` } });
+});
+
+app.delete("/api/admin/media/:id", requireAuth(), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "Invalid id" });
+  const result = await pool.query(
+    "select id, filename from media where id = $1",
+    [id]
+  );
+  const item = result.rows[0];
+  if (!item) return res.status(404).json({ error: "Not found" });
+  await pool.query("delete from media where id = $1", [id]);
+  const filePath = path.join(uploadRoot, item.filename);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+  res.status(204).end();
 });
 
 async function start() {

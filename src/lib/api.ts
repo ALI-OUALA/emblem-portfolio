@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "";
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const response = await fetch(`${API_BASE}${path}`, {

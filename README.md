@@ -1,9 +1,16 @@
 # Emblém Portfolio
 Editorial-grade portfolio with a custom CMS dashboard.
 
-## Frontend (Vite + React)
-Run `npm i` to install dependencies.  
-Run `npm run dev` to start the frontend at `http://localhost:3000`.
+## Frontend (Next.js)
+```
+npm i
+npm run dev
+```
+
+Open `http://localhost:3000` and `/admin`.
+
+### Environment
+Set `NEXT_PUBLIC_API_URL` to your backend URL in `.env.local` when using the CMS.
 
 ## Backend (Node + Express)
 The API and CMS live in `server/`.

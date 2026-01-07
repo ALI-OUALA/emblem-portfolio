@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState } from "react";
 import { apiFetch, API_BASE } from "@/lib/api";
 import { defaultProjects, defaultServices, defaultSettings } from "@/site/content";
@@ -21,6 +23,16 @@ type Inquiry = {
   company: string | null;
   message: string;
   created_at: string;
+};
+
+type MediaItem = {
+  id: number;
+  filename: string;
+  original_name: string;
+  mime: string;
+  size: number;
+  created_at: string;
+  url: string;
 };
 
 export function AdminApp() {
@@ -107,6 +119,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [services, setServices] = useState<ServiceItem[]>(defaultServices as ServiceItem[]);
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects as ProjectItem[]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [media, setMedia] = useState<MediaItem[]>([]);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -116,6 +129,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         setServices(data.services ?? []);
         setProjects(data.projects ?? []);
         setInquiries(data.inquiries ?? []);
+        setMedia(data.media ?? []);
       })
       .catch(() => {
         setStatus("Could not load admin content.");
@@ -152,6 +166,41 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const logout = async () => {
     await apiFetch("/api/auth/logout", { method: "POST" });
     onLogout();
+  };
+
+  const uploadMedia = async (file: File) => {
+    if (!API_BASE) {
+      setStatus("Set NEXT_PUBLIC_API_URL to enable uploads.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(`${API_BASE}/api/admin/media`, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+    if (!response.ok) {
+      setStatus("Upload failed.");
+      return;
+    }
+    const data = await response.json();
+    setMedia((prev) => [data.media, ...prev]);
+    setStatus("Media uploaded.");
+  };
+
+  const deleteMedia = async (id: number) => {
+    if (!API_BASE) return;
+    const response = await fetch(`${API_BASE}/api/admin/media/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      setStatus("Delete failed.");
+      return;
+    }
+    setMedia((prev) => prev.filter((item) => item.id !== id));
+    setStatus("Media deleted.");
   };
 
   return (
@@ -508,6 +557,62 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 <p className="text-sm text-muted">{inquiry.message}</p>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div className="admin-divider" />
+
+      <div className="admin-card stack-md">
+        <h2 className="admin-section-title">Media library</h2>
+        <p className="admin-note">
+          Upload images to reuse across the site. Max 10MB per file.
+        </p>
+        <input
+          className="field"
+          type="file"
+          accept="image/*"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) uploadMedia(file);
+            event.currentTarget.value = "";
+          }}
+        />
+        {media.length === 0 ? (
+          <p className="admin-note">No media uploaded yet.</p>
+        ) : (
+          <div className="admin-list">
+            {media.map((item) => {
+              const url = API_BASE ? `${API_BASE}${item.url}` : item.url;
+              return (
+                <div key={item.id} className="admin-row">
+                  <div className="admin-grid">
+                    <div className="stack-sm">
+                      <p className="text-sm text-ink">{item.original_name}</p>
+                      <p className="text-xs text-soft">
+                        {Math.round(item.size / 1024)} KB · {item.mime}
+                      </p>
+                      <a className="text-xs text-soft" href={url} target="_blank" rel="noreferrer">
+                        {url}
+                      </a>
+                    </div>
+                    {item.mime.startsWith("image/") ? (
+                      <img
+                        src={url}
+                        alt={item.original_name}
+                        style={{ width: "100%", border: "2px solid var(--line)" }}
+                      />
+                    ) : null}
+                  </div>
+                  <div className="admin-actions">
+                    <GhostButton onClick={() => navigator.clipboard.writeText(url)}>
+                      Copy URL
+                    </GhostButton>
+                    <GhostButton onClick={() => deleteMedia(item.id)}>Delete</GhostButton>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

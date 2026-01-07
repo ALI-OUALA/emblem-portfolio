@@ -2,9 +2,12 @@ node_modules/
 build/
 dist/
 .vite/
+.next/
+out/
 .env
 .env.*
 .env.local
 server/.env
+server/uploads/
 DEPLOYMENT_GUIDE.local.md
 .DS_Store

@@ -1,9 +1,10 @@
 
   {
-    "name": "emblem-portfolio",
-    "version": "0.2.0",
-    "private": true,
-    "type": "module",
+  "name": "emblem-portfolio",
+  "version": "0.2.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
   "dependencies": {
     "framer-motion": "^11.0.0",
     "lucide-react": "^0.487.0",

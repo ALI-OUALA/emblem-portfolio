@@ -755,7 +755,7 @@ async function start() {
   await pruneExpiredSessions();
   const pruneInterval = 1000 * 60 * 60 * 6;
   setInterval(() => {
-    pruneExpiredSessions().catch(() => {});
+    pruneExpiredSessions().catch((err) => console.error("Failed to prune expired sessions:", err));
   }, pruneInterval).unref();
   app.listen(PORT, () => {
     console.log(`API running on port ${PORT}`);

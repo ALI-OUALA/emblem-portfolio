@@ -6,7 +6,7 @@ import { Services } from '@/sections/Services';
 import { Work } from '@/sections/Work';
 import { Contact } from '@/sections/Contact';
 import { Footer } from '@/sections/Footer';
-import { apiFetch, API_BASE } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { defaultProjects, defaultServices, defaultSettings } from './content';
 
 type ContentState = {
@@ -22,7 +22,6 @@ export function SiteHome() {
     projects: defaultProjects,
   });
   useEffect(() => {
-    if (!API_BASE) return;
     let active = true;
     apiFetch('/api/public/content')
       .then((data) => {

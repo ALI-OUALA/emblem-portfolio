@@ -1,12 +1,20 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiFetch, API_BASE } from "@/lib/api";
+import { apiFetch, API_BASE, clearCsrfToken, setCsrfToken } from "@/lib/api";
 import { defaultProjects, defaultServices, defaultSettings } from "@/site/content";
 import { PrimaryButton, GhostButton } from "@/components/ui/button";
 
 type User = { id: number; email: string; role: string };
-type ServiceItem = { id: number; title: string; desc: string; meta: string; position?: number };
+type ServiceItem = {
+  id: number;
+  title: string;
+  desc: string;
+  meta: string;
+  position?: number;
+  is_published?: boolean;
+  updated_at?: string;
+};
 type ProjectItem = {
   id: number;
   title: string;
@@ -15,6 +23,8 @@ type ProjectItem = {
   year: string;
   focus: string;
   position?: number;
+  is_published?: boolean;
+  updated_at?: string;
 };
 type Inquiry = {
   id: number;
@@ -41,8 +51,14 @@ export function AdminApp() {
 
   useEffect(() => {
     apiFetch("/api/admin/me")
-      .then((data) => setUser(data.user))
-      .catch(() => setUser(null))
+      .then((data) => {
+        setUser(data.user);
+        setCsrfToken(data.csrfToken);
+      })
+      .catch(() => {
+        clearCsrfToken();
+        setUser(null);
+      })
       .finally(() => setChecking(false));
   }, []);
 
@@ -70,6 +86,7 @@ function Login({ onSuccess }: { onSuccess: (user: User) => void }) {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
+      setCsrfToken(data.csrfToken);
       onSuccess(data.user);
     } catch (err) {
       setError("Invalid email or password.");
@@ -120,82 +137,178 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects as ProjectItem[]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [settingsBaseline, setSettingsBaseline] = useState(() =>
+    JSON.stringify(defaultSettings)
+  );
+  const [servicesBaseline, setServicesBaseline] = useState(() =>
+    JSON.stringify(defaultServices)
+  );
+  const [projectsBaseline, setProjectsBaseline] = useState(() =>
+    JSON.stringify(defaultProjects)
+  );
   const [status, setStatus] = useState("");
 
   useEffect(() => {
     apiFetch("/api/admin/content")
       .then((data) => {
-        setSettings({ ...defaultSettings, ...data.settings });
-        setServices(data.services ?? []);
-        setProjects(data.projects ?? []);
+        const nextSettings = { ...defaultSettings, ...data.settings };
+        const nextServices = (data.services ?? []).map((item: ServiceItem) => ({
+          ...item,
+          is_published: item.is_published ?? true,
+        }));
+        const nextProjects = (data.projects ?? []).map((item: ProjectItem) => ({
+          ...item,
+          is_published: item.is_published ?? true,
+        }));
+        setSettings(nextSettings);
+        setServices(nextServices);
+        setProjects(nextProjects);
         setInquiries(data.inquiries ?? []);
         setMedia(data.media ?? []);
+        setSettingsBaseline(JSON.stringify(nextSettings));
+        setServicesBaseline(JSON.stringify(nextServices));
+        setProjectsBaseline(JSON.stringify(nextProjects));
       })
       .catch(() => {
         setStatus("Could not load admin content.");
       });
   }, []);
 
+  const settingsSnapshot = JSON.stringify(settings);
+  const servicesSnapshot = JSON.stringify(services);
+  const projectsSnapshot = JSON.stringify(projects);
+
+  const settingsDirty = settingsSnapshot !== settingsBaseline;
+  const servicesDirty = servicesSnapshot !== servicesBaseline;
+  const projectsDirty = projectsSnapshot !== projectsBaseline;
+
+  const settingsValid =
+    settings.heroBadge.trim().length > 0 &&
+    settings.heroTitle.trim().length > 0 &&
+    settings.heroSubtitle.trim().length > 0 &&
+    settings.contactTitle.trim().length > 0 &&
+    settings.contactSubtitle.trim().length > 0 &&
+    settings.contactEmail.trim().length > 0 &&
+    settings.footerBlurb.trim().length > 0;
+
+  const serviceErrors = services.map((service) => ({
+    title: !service.title.trim(),
+    meta: !service.meta.trim(),
+    desc: !service.desc.trim(),
+  }));
+  const servicesValid = serviceErrors.every(
+    (item) => !item.title && !item.meta && !item.desc
+  );
+
+  const projectErrors = projects.map((project) => ({
+    title: !project.title.trim(),
+    role: !project.role.trim(),
+    summary: !project.summary.trim(),
+    year: !project.year.trim(),
+    focus: !project.focus.trim(),
+  }));
+  const projectsValid = projectErrors.every(
+    (item) => !item.title && !item.role && !item.summary && !item.year && !item.focus
+  );
+
+  const formatTimestamp = (value?: string) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
+  };
+
   const saveSettings = async () => {
-    setStatus("");
-    await apiFetch("/api/admin/settings", {
-      method: "PUT",
-      body: JSON.stringify(settings),
-    });
-    setStatus("Settings saved.");
+    if (!settingsDirty) return;
+    if (!settingsValid) {
+      setStatus("Fix the highlighted settings fields before saving.");
+      return;
+    }
+    setStatus("Saving settings…");
+    try {
+      await apiFetch("/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings),
+      });
+      setSettingsBaseline(settingsSnapshot);
+      setStatus("Settings saved.");
+    } catch (err) {
+      setStatus("Settings save failed.");
+    }
   };
 
   const saveServices = async () => {
-    setStatus("");
-    await apiFetch("/api/admin/services", {
-      method: "PUT",
-      body: JSON.stringify(services),
-    });
-    setStatus("Services saved.");
+    if (!servicesDirty) return;
+    if (!servicesValid) {
+      setStatus("Fix the highlighted service fields before saving.");
+      return;
+    }
+    setStatus("Saving services…");
+    try {
+      await apiFetch("/api/admin/services", {
+        method: "PUT",
+        body: JSON.stringify(services),
+      });
+      const stamped = services.map((service) => ({
+        ...service,
+        updated_at: new Date().toISOString(),
+      }));
+      setServices(stamped);
+      setServicesBaseline(JSON.stringify(stamped));
+      setStatus("Services saved.");
+    } catch (err) {
+      setStatus("Services save failed.");
+    }
   };
 
   const saveProjects = async () => {
-    setStatus("");
-    await apiFetch("/api/admin/projects", {
-      method: "PUT",
-      body: JSON.stringify(projects),
-    });
-    setStatus("Projects saved.");
+    if (!projectsDirty) return;
+    if (!projectsValid) {
+      setStatus("Fix the highlighted project fields before saving.");
+      return;
+    }
+    setStatus("Saving projects…");
+    try {
+      await apiFetch("/api/admin/projects", {
+        method: "PUT",
+        body: JSON.stringify(projects),
+      });
+      const stamped = projects.map((project) => ({
+        ...project,
+        updated_at: new Date().toISOString(),
+      }));
+      setProjects(stamped);
+      setProjectsBaseline(JSON.stringify(stamped));
+      setStatus("Projects saved.");
+    } catch (err) {
+      setStatus("Projects save failed.");
+    }
   };
 
   const logout = async () => {
     await apiFetch("/api/auth/logout", { method: "POST" });
+    clearCsrfToken();
     onLogout();
   };
 
   const uploadMedia = async (file: File) => {
-    if (!API_BASE) {
-      setStatus("Set NEXT_PUBLIC_API_URL to enable uploads.");
-      return;
-    }
     const formData = new FormData();
     formData.append("file", file);
-    const response = await fetch(`${API_BASE}/api/admin/media`, {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-    if (!response.ok) {
+    try {
+      const data = await apiFetch("/api/admin/media", {
+        method: "POST",
+        body: formData,
+      });
+      setMedia((prev) => [data.media, ...prev]);
+      setStatus("Media uploaded.");
+    } catch (err) {
       setStatus("Upload failed.");
-      return;
     }
-    const data = await response.json();
-    setMedia((prev) => [data.media, ...prev]);
-    setStatus("Media uploaded.");
   };
 
   const deleteMedia = async (id: number) => {
-    if (!API_BASE) return;
-    const response = await fetch(`${API_BASE}/api/admin/media/${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!response.ok) {
+    try {
+      await apiFetch(`/api/admin/media/${id}`, { method: "DELETE" });
+    } catch (err) {
       setStatus("Delete failed.");
       return;
     }
@@ -216,15 +329,24 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         </div>
       </div>
 
-      {status ? <p className="text-sm text-soft mb-8">{status}</p> : null}
+      {status ? <p className="admin-status">{status}</p> : null}
 
       <div className="admin-card stack-md">
-        <h2 className="admin-section-title">Site settings</h2>
+        <div className="admin-section-header">
+          <h2 className="admin-section-title">Site settings</h2>
+          <div className="admin-chip-row">
+            <span className={`status-chip ${settingsDirty ? "is-warning" : "is-live"}`}>
+              {settingsDirty ? "Unsaved" : "Saved"}
+            </span>
+            {!settingsValid ? <span className="status-chip is-danger">Needs fixes</span> : null}
+          </div>
+        </div>
         <div className="admin-grid">
           <label className="stack-sm">
             <span className="text-xs text-soft">Hero badge</span>
             <input
-              className="field"
+              className={`field ${!settings.heroBadge.trim() ? "is-invalid" : ""}`}
+              aria-invalid={!settings.heroBadge.trim()}
               value={settings.heroBadge}
               onChange={(e) => setSettings({ ...settings, heroBadge: e.target.value })}
             />
@@ -232,7 +354,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           <label className="stack-sm">
             <span className="text-xs text-soft">Contact email</span>
             <input
-              className="field"
+              className={`field ${!settings.contactEmail.trim() ? "is-invalid" : ""}`}
+              aria-invalid={!settings.contactEmail.trim()}
               value={settings.contactEmail}
               onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
             />
@@ -241,7 +364,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <label className="stack-sm">
           <span className="text-xs text-soft">Hero title</span>
           <input
-            className="field"
+            className={`field ${!settings.heroTitle.trim() ? "is-invalid" : ""}`}
+            aria-invalid={!settings.heroTitle.trim()}
             value={settings.heroTitle}
             onChange={(e) => setSettings({ ...settings, heroTitle: e.target.value })}
           />
@@ -249,7 +373,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <label className="stack-sm">
           <span className="text-xs text-soft">Hero subtitle</span>
           <textarea
-            className="field"
+            className={`field ${!settings.heroSubtitle.trim() ? "is-invalid" : ""}`}
+            aria-invalid={!settings.heroSubtitle.trim()}
             rows={3}
             value={settings.heroSubtitle}
             onChange={(e) => setSettings({ ...settings, heroSubtitle: e.target.value })}
@@ -269,7 +394,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <label className="stack-sm">
           <span className="text-xs text-soft">Contact headline</span>
           <input
-            className="field"
+            className={`field ${!settings.contactTitle.trim() ? "is-invalid" : ""}`}
+            aria-invalid={!settings.contactTitle.trim()}
             value={settings.contactTitle}
             onChange={(e) => setSettings({ ...settings, contactTitle: e.target.value })}
           />
@@ -277,7 +403,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <label className="stack-sm">
           <span className="text-xs text-soft">Contact subtitle</span>
           <textarea
-            className="field"
+            className={`field ${!settings.contactSubtitle.trim() ? "is-invalid" : ""}`}
+            aria-invalid={!settings.contactSubtitle.trim()}
             rows={3}
             value={settings.contactSubtitle}
             onChange={(e) => setSettings({ ...settings, contactSubtitle: e.target.value })}
@@ -297,7 +424,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         <label className="stack-sm">
           <span className="text-xs text-soft">Footer blurb</span>
           <input
-            className="field"
+            className={`field ${!settings.footerBlurb.trim() ? "is-invalid" : ""}`}
+            aria-invalid={!settings.footerBlurb.trim()}
             value={settings.footerBlurb}
             onChange={(e) => setSettings({ ...settings, footerBlurb: e.target.value })}
           />
@@ -330,19 +458,46 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             />
           </label>
         </div>
-        <PrimaryButton onClick={saveSettings}>Save settings</PrimaryButton>
+        <PrimaryButton onClick={saveSettings} disabled={!settingsDirty || !settingsValid}>
+          Save settings
+        </PrimaryButton>
       </div>
 
       <div className="admin-divider" />
 
       <div className="admin-card stack-md">
-        <h2 className="admin-section-title">Services</h2>
+        <div className="admin-section-header">
+          <h2 className="admin-section-title">Services</h2>
+          <div className="admin-chip-row">
+            <span className={`status-chip ${servicesDirty ? "is-warning" : "is-live"}`}>
+              {servicesDirty ? "Unsaved" : "Saved"}
+            </span>
+            {!servicesValid ? <span className="status-chip is-danger">Needs fixes</span> : null}
+          </div>
+        </div>
         <div className="admin-list">
           {services.map((service, index) => (
             <div key={service.id} className="admin-row">
+              <div className="admin-row-header">
+                <button
+                  type="button"
+                  className={`status-chip ${service.is_published ? "is-live" : "is-draft"}`}
+                  onClick={() => {
+                    const next = [...services];
+                    next[index] = { ...service, is_published: !service.is_published };
+                    setServices(next);
+                  }}
+                >
+                  {service.is_published ? "Published" : "Draft"}
+                </button>
+                <span className="text-xs text-soft">
+                  Updated {formatTimestamp(service.updated_at)}
+                </span>
+              </div>
               <div className="admin-grid">
                 <input
-                  className="field"
+                  className={`field ${serviceErrors[index]?.title ? "is-invalid" : ""}`}
+                  aria-invalid={serviceErrors[index]?.title}
                   value={service.title}
                   onChange={(e) => {
                     const next = [...services];
@@ -352,7 +507,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   placeholder="Service title"
                 />
                 <input
-                  className="field"
+                  className={`field ${serviceErrors[index]?.meta ? "is-invalid" : ""}`}
+                  aria-invalid={serviceErrors[index]?.meta}
                   value={service.meta}
                   onChange={(e) => {
                     const next = [...services];
@@ -363,7 +519,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 />
               </div>
               <textarea
-                className="field"
+                className={`field ${serviceErrors[index]?.desc ? "is-invalid" : ""}`}
+                aria-invalid={serviceErrors[index]?.desc}
                 rows={2}
                 value={service.desc}
                 onChange={(e) => {
@@ -408,26 +565,59 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             onClick={() =>
               setServices([
                 ...services,
-                { id: Date.now(), title: "New service", desc: "", meta: "New" },
+                {
+                  id: Date.now(),
+                  title: "New service",
+                  desc: "",
+                  meta: "New",
+                  is_published: false,
+                },
               ])
             }
           >
             Add service
           </GhostButton>
-          <PrimaryButton onClick={saveServices}>Save services</PrimaryButton>
+          <PrimaryButton onClick={saveServices} disabled={!servicesDirty || !servicesValid}>
+            Save services
+          </PrimaryButton>
         </div>
       </div>
 
       <div className="admin-divider" />
 
       <div className="admin-card stack-md">
-        <h2 className="admin-section-title">Projects</h2>
+        <div className="admin-section-header">
+          <h2 className="admin-section-title">Projects</h2>
+          <div className="admin-chip-row">
+            <span className={`status-chip ${projectsDirty ? "is-warning" : "is-live"}`}>
+              {projectsDirty ? "Unsaved" : "Saved"}
+            </span>
+            {!projectsValid ? <span className="status-chip is-danger">Needs fixes</span> : null}
+          </div>
+        </div>
         <div className="admin-list">
           {projects.map((project, index) => (
             <div key={project.id} className="admin-row">
+              <div className="admin-row-header">
+                <button
+                  type="button"
+                  className={`status-chip ${project.is_published ? "is-live" : "is-draft"}`}
+                  onClick={() => {
+                    const next = [...projects];
+                    next[index] = { ...project, is_published: !project.is_published };
+                    setProjects(next);
+                  }}
+                >
+                  {project.is_published ? "Published" : "Draft"}
+                </button>
+                <span className="text-xs text-soft">
+                  Updated {formatTimestamp(project.updated_at)}
+                </span>
+              </div>
               <div className="admin-grid">
                 <input
-                  className="field"
+                  className={`field ${projectErrors[index]?.title ? "is-invalid" : ""}`}
+                  aria-invalid={projectErrors[index]?.title}
                   value={project.title}
                   onChange={(e) => {
                     const next = [...projects];
@@ -437,7 +627,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   placeholder="Project title"
                 />
                 <input
-                  className="field"
+                  className={`field ${projectErrors[index]?.year ? "is-invalid" : ""}`}
+                  aria-invalid={projectErrors[index]?.year}
                   value={project.year}
                   onChange={(e) => {
                     const next = [...projects];
@@ -449,7 +640,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               </div>
               <div className="admin-grid">
                 <input
-                  className="field"
+                  className={`field ${projectErrors[index]?.role ? "is-invalid" : ""}`}
+                  aria-invalid={projectErrors[index]?.role}
                   value={project.role}
                   onChange={(e) => {
                     const next = [...projects];
@@ -459,7 +651,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   placeholder="Role"
                 />
                 <input
-                  className="field"
+                  className={`field ${projectErrors[index]?.focus ? "is-invalid" : ""}`}
+                  aria-invalid={projectErrors[index]?.focus}
                   value={project.focus}
                   onChange={(e) => {
                     const next = [...projects];
@@ -470,7 +663,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 />
               </div>
               <textarea
-                className="field"
+                className={`field ${projectErrors[index]?.summary ? "is-invalid" : ""}`}
+                aria-invalid={projectErrors[index]?.summary}
                 rows={2}
                 value={project.summary}
                 onChange={(e) => {
@@ -522,13 +716,16 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   summary: "",
                   year: "2026",
                   focus: "New",
+                  is_published: false,
                 },
               ])
             }
           >
             Add project
           </GhostButton>
-          <PrimaryButton onClick={saveProjects}>Save projects</PrimaryButton>
+          <PrimaryButton onClick={saveProjects} disabled={!projectsDirty || !projectsValid}>
+            Save projects
+          </PrimaryButton>
         </div>
       </div>
 
@@ -566,7 +763,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       <div className="admin-card stack-md">
         <h2 className="admin-section-title">Media library</h2>
         <p className="admin-note">
-          Upload images to reuse across the site. Max 10MB per file.
+          Upload images to reuse across the site. JPEG/PNG/WebP/GIF, max 10MB per file.
         </p>
         <input
           className="field"

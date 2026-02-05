@@ -22,36 +22,42 @@ export const defaultServices = [
     title: "Brand Systems",
     desc: "Names, identities, and art direction that translate into real assets and usable templates.",
     meta: "Identity",
+    is_published: true,
   },
   {
     id: 2,
     title: "Launch & Marketing Sites",
     desc: "High-contrast sites for new products, waitlists, and sharp announcements with real conversions.",
     meta: "Web",
+    is_published: true,
   },
   {
     id: 3,
     title: "Product UX",
     desc: "Design language, UI flows, and dashboard UI that scales without losing character.",
     meta: "Product",
+    is_published: true,
   },
   {
     id: 4,
     title: "Design Systems",
     desc: "Tokens, components, and patterns that keep every new screen on-brand and consistent.",
     meta: "Systems",
+    is_published: true,
   },
   {
     id: 5,
     title: "Studio Retainers",
     desc: "Monthly design and dev support for teams who want a small, focused partner.",
     meta: "Support",
+    is_published: true,
   },
   {
     id: 6,
     title: "Creative Direction",
     desc: "Visual strategy and art direction for teams working with AI or rapid content pipelines.",
     meta: "Direction",
+    is_published: true,
   },
 ];
 
@@ -64,6 +70,7 @@ export const defaultProjects = [
       "Concept: a minimal interface for research teams to collect and share findings without the usual noise.",
     year: "2024",
     focus: "Research",
+    is_published: true,
   },
   {
     id: 2,
@@ -72,6 +79,7 @@ export const defaultProjects = [
     summary: "Study: editorial layout for an architecture studio crossing physical and digital spaces.",
     year: "2023",
     focus: "Editorial",
+    is_published: true,
   },
   {
     id: 3,
@@ -80,6 +88,7 @@ export const defaultProjects = [
     summary: "Concept: fast, legible dashboards that help growth teams make daily calls quickly.",
     year: "2023",
     focus: "Data",
+    is_published: true,
   },
   {
     id: 4,
@@ -88,6 +97,7 @@ export const defaultProjects = [
     summary: "Exploration: a refined logotype, palette, and landing page system for a productivity tool.",
     year: "2022",
     focus: "Brand",
+    is_published: true,
   },
   {
     id: 5,
@@ -96,6 +106,7 @@ export const defaultProjects = [
     summary: "Concept: simplified onboarding and care plans for a digital health platform.",
     year: "2022",
     focus: "Health",
+    is_published: true,
   },
   {
     id: 6,
@@ -104,5 +115,6 @@ export const defaultProjects = [
     summary: "Study: a restrained identity and shopping journey for a small-batch home goods label.",
     year: "2021",
     focus: "Commerce",
+    is_published: true,
   },
 ];

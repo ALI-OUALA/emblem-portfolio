@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { SectionHeading } from '@/components/ui/Section';
 import { PrimaryButton } from '@/components/ui/button';
-import { apiFetch, API_BASE } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 type ContactProps = {
   title: string;
@@ -15,24 +15,25 @@ type ContactProps = {
 };
 
 export function Contact({ title, subtitle, notes, email }: ContactProps) {
-  const [form, setForm] = useState({ name: '', email: '', company: '', message: '' });
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    company: '',
+    message: '',
+    website: '',
+  });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
     try {
-      if (!API_BASE) {
-        setStatus('success');
-        setForm({ name: '', email: '', company: '', message: '' });
-        return;
-      }
       await apiFetch('/api/public/inquiries', {
         method: 'POST',
         body: JSON.stringify(form),
       });
       setStatus('success');
-      setForm({ name: '', email: '', company: '', message: '' });
+      setForm({ name: '', email: '', company: '', message: '', website: '' });
     } catch (err) {
       console.error(err);
       setStatus('error');
@@ -94,6 +95,15 @@ export function Contact({ title, subtitle, notes, email }: ContactProps) {
             onChange={(e) => setForm({ ...form, company: e.target.value })}
             placeholder="Company or project name (optional)"
             className="field"
+          />
+          <input
+            value={form.website}
+            onChange={(e) => setForm({ ...form, website: e.target.value })}
+            placeholder="Website"
+            className="hidden"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
           />
           <textarea
             required

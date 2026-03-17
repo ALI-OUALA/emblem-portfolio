@@ -128,6 +128,7 @@ npm run dev
 
 Frontend environment:
 - `NEXT_PUBLIC_API_URL` set to the backend URL when running cross-origin.
+- Copy `.env.example` to `.env.local` for local split-origin development.
 
 Backend required environment:
 - `DATABASE_URL` (Postgres connection string)
@@ -139,14 +140,22 @@ Backend optional environment:
 - `CORS_ORIGIN`, `COOKIE_SECURE`, `COOKIE_SAMESITE`
 - `TRUST_PROXY`, `UPLOAD_MAX_MB`, `UPLOAD_DIR`
 
+Project checks:
+```bash
+npm run lint
+npm run build
+```
+
 **Deployment Notes**
-Recommended split deployment (from `DEPLOYMENT_GUIDE.local.md`):
+Recommended split deployment:
 - Frontend: Vercel
 - Backend: Render
-- Database: Render Postgres
+- Database: Neon Postgres
 - Media: backend filesystem `/uploads`
 
-Important note: on free hosting tiers, filesystem storage can be ephemeral. For production media permanence, attach a persistent disk or move uploads to S3-compatible storage.
+See `DEPLOYMENT.md` for the production environment contract, Render blueprint, health check behavior, and smoke-test workflow.
+
+Important note: filesystem storage must be backed by a persistent disk in production. If you later outgrow local disk storage, move uploads to S3-compatible object storage.
 
 **Evolution From the Previous Version**
 Baseline comparison: commit `0696597` (Vite-only static portfolio).

@@ -473,8 +473,45 @@ function requireCsrf() {
   };
 }
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+async function getHealthReport() {
+  const checks = {
+    database: { status: "ok" },
+    uploads: { status: "ok", path: uploadRoot },
+  };
+
+  let ok = true;
+
+  try {
+    await pool.query("select 1");
+  } catch (error) {
+    ok = false;
+    checks.database = {
+      status: "error",
+      message: error instanceof Error ? error.message : "Database check failed",
+    };
+  }
+
+  try {
+    fs.accessSync(uploadRoot, fs.constants.R_OK | fs.constants.W_OK);
+  } catch (error) {
+    ok = false;
+    checks.uploads = {
+      status: "error",
+      path: uploadRoot,
+      message: error instanceof Error ? error.message : "Upload directory check failed",
+    };
+  }
+
+  return {
+    status: ok ? "ok" : "degraded",
+    checks,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+app.get("/api/health", async (req, res) => {
+  const report = await getHealthReport();
+  res.status(report.status === "ok" ? 200 : 503).json(report);
 });
 
 app.get("/api/public/content", async (req, res) => {

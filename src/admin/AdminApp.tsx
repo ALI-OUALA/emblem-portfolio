@@ -1,9 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { apiFetch, API_BASE, clearCsrfToken, setCsrfToken } from "@/lib/api";
-import { defaultProjects, defaultServices, defaultSettings } from "@/site/content";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  API_BASE,
+  ApiError,
+  apiFetch,
+  clearCsrfToken,
+  getApiErrorMessage,
+  setCsrfToken,
+} from "@/lib/api";
 import { PrimaryButton, GhostButton } from "@/components/ui/button";
+import { defaultProjects, defaultServices, defaultSettings } from "@/site/content";
 
 type User = { id: number; email: string; role: string };
 type ServiceItem = {
@@ -45,35 +52,99 @@ type MediaItem = {
   url: string;
 };
 
+function isUnauthorized(error: unknown) {
+  return error instanceof ApiError && error.status === 401;
+}
+
+function getApiLocationLabel() {
+  return API_BASE || "same-origin";
+}
+
+function getConnectionMessage(error: unknown) {
+  const message = getApiErrorMessage(error, "Could not reach the CMS API.");
+  return `${message} Check the backend URL and cookie/CORS settings for ${getApiLocationLabel()}.`;
+}
+
+function getActionError(prefix: string, error: unknown) {
+  return `${prefix} ${getApiErrorMessage(error)}`;
+}
+
 export function AdminApp() {
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
+  const [apiUnavailable, setApiUnavailable] = useState("");
 
-  useEffect(() => {
+  const checkSession = useCallback(() => {
+    setChecking(true);
+    setApiUnavailable("");
     apiFetch("/api/admin/me")
       .then((data) => {
         setUser(data.user);
         setCsrfToken(data.csrfToken);
       })
-      .catch(() => {
+      .catch((error) => {
         clearCsrfToken();
         setUser(null);
+        if (isUnauthorized(error)) return;
+        setApiUnavailable(getConnectionMessage(error));
       })
       .finally(() => setChecking(false));
   }, []);
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
 
   if (checking) {
     return <div className="admin-shell">Loading dashboard…</div>;
   }
 
-  if (!user) {
-    return <Login onSuccess={(u) => setUser(u)} />;
+  if (apiUnavailable) {
+    return <ApiUnavailable message={apiUnavailable} onRetry={checkSession} />;
   }
 
-  return <Dashboard user={user} onLogout={() => setUser(null)} />;
+  if (!user) {
+    return <Login onSuccess={(nextUser) => setUser(nextUser)} onApiFailure={setApiUnavailable} />;
+  }
+
+  return (
+    <Dashboard
+      user={user}
+      onLogout={() => setUser(null)}
+      onSessionLost={() => {
+        clearCsrfToken();
+        setUser(null);
+      }}
+      onApiFailure={setApiUnavailable}
+    />
+  );
 }
 
-function Login({ onSuccess }: { onSuccess: (user: User) => void }) {
+function ApiUnavailable({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="admin-shell">
+      <div className="admin-card stack-md">
+        <div className="stack-sm">
+          <div className="pill">CMS API Unavailable</div>
+          <h1 className="admin-section-title">The dashboard cannot reach its backend.</h1>
+          <p className="admin-note">{message}</p>
+          <p className="admin-note">Current API target: {getApiLocationLabel()}</p>
+        </div>
+        <div className="admin-actions">
+          <PrimaryButton onClick={onRetry}>Retry connection</PrimaryButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Login({
+  onSuccess,
+  onApiFailure,
+}: {
+  onSuccess: (user: User) => void;
+  onApiFailure: (message: string) => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -88,8 +159,14 @@ function Login({ onSuccess }: { onSuccess: (user: User) => void }) {
       });
       setCsrfToken(data.csrfToken);
       onSuccess(data.user);
-    } catch (err) {
-      setError("Invalid email or password.");
+    } catch (caught) {
+      if (isUnauthorized(caught)) {
+        setError("Invalid email or password.");
+        return;
+      }
+      const message = getConnectionMessage(caught);
+      setError(message);
+      onApiFailure(message);
     }
   };
 
@@ -125,13 +202,23 @@ function Login({ onSuccess }: { onSuccess: (user: User) => void }) {
           {error ? <p className="text-xs text-soft">{error}</p> : null}
           <PrimaryButton type="submit">Enter dashboard</PrimaryButton>
         </form>
-        <p className="admin-note">API: {API_BASE || "same-origin"}</p>
+        <p className="admin-note">API: {getApiLocationLabel()}</p>
       </div>
     </div>
   );
 }
 
-function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
+function Dashboard({
+  user,
+  onLogout,
+  onSessionLost,
+  onApiFailure,
+}: {
+  user: User;
+  onLogout: () => void;
+  onSessionLost: () => void;
+  onApiFailure: (message: string) => void;
+}) {
   const [settings, setSettings] = useState(defaultSettings);
   const [services, setServices] = useState<ServiceItem[]>(defaultServices as ServiceItem[]);
   const [projects, setProjects] = useState<ProjectItem[]>(defaultProjects as ProjectItem[]);
@@ -149,8 +236,11 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
+    let active = true;
+
     apiFetch("/api/admin/content")
       .then((data) => {
+        if (!active) return;
         const nextSettings = { ...defaultSettings, ...data.settings };
         const nextServices = (data.services ?? []).map((item: ServiceItem) => ({
           ...item,
@@ -169,10 +259,22 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
         setServicesBaseline(JSON.stringify(nextServices));
         setProjectsBaseline(JSON.stringify(nextProjects));
       })
-      .catch(() => {
-        setStatus("Could not load admin content.");
+      .catch((error) => {
+        if (!active) return;
+        if (isUnauthorized(error)) {
+          setStatus("Your session expired. Please sign in again.");
+          onSessionLost();
+          return;
+        }
+        const message = getConnectionMessage(error);
+        setStatus(message);
+        onApiFailure(message);
       });
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [onApiFailure, onSessionLost]);
 
   const settingsSnapshot = JSON.stringify(settings);
   const servicesSnapshot = JSON.stringify(services);
@@ -231,8 +333,13 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       });
       setSettingsBaseline(settingsSnapshot);
       setStatus("Settings saved.");
-    } catch (err) {
-      setStatus("Settings save failed.");
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        setStatus("Your session expired. Please sign in again.");
+        onSessionLost();
+        return;
+      }
+      setStatus(getActionError("Settings save failed.", error));
     }
   };
 
@@ -255,8 +362,13 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       setServices(stamped);
       setServicesBaseline(JSON.stringify(stamped));
       setStatus("Services saved.");
-    } catch (err) {
-      setStatus("Services save failed.");
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        setStatus("Your session expired. Please sign in again.");
+        onSessionLost();
+        return;
+      }
+      setStatus(getActionError("Services save failed.", error));
     }
   };
 
@@ -279,15 +391,29 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       setProjects(stamped);
       setProjectsBaseline(JSON.stringify(stamped));
       setStatus("Projects saved.");
-    } catch (err) {
-      setStatus("Projects save failed.");
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        setStatus("Your session expired. Please sign in again.");
+        onSessionLost();
+        return;
+      }
+      setStatus(getActionError("Projects save failed.", error));
     }
   };
 
   const logout = async () => {
-    await apiFetch("/api/auth/logout", { method: "POST" });
-    clearCsrfToken();
-    onLogout();
+    try {
+      await apiFetch("/api/auth/logout", { method: "POST" });
+      clearCsrfToken();
+      onLogout();
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        clearCsrfToken();
+        onLogout();
+        return;
+      }
+      setStatus(getActionError("Logout failed.", error));
+    }
   };
 
   const uploadMedia = async (file: File) => {
@@ -300,16 +426,26 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       });
       setMedia((prev) => [data.media, ...prev]);
       setStatus("Media uploaded.");
-    } catch (err) {
-      setStatus("Upload failed.");
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        setStatus("Your session expired. Please sign in again.");
+        onSessionLost();
+        return;
+      }
+      setStatus(getActionError("Upload failed.", error));
     }
   };
 
   const deleteMedia = async (id: number) => {
     try {
       await apiFetch(`/api/admin/media/${id}`, { method: "DELETE" });
-    } catch (err) {
-      setStatus("Delete failed.");
+    } catch (error) {
+      if (isUnauthorized(error)) {
+        setStatus("Your session expired. Please sign in again.");
+        onSessionLost();
+        return;
+      }
+      setStatus(getActionError("Delete failed.", error));
       return;
     }
     setMedia((prev) => prev.filter((item) => item.id !== id));
@@ -417,7 +553,10 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
             rows={2}
             value={settings.contactNotes.join("\n")}
             onChange={(e) =>
-              setSettings({ ...settings, contactNotes: e.target.value.split("\n").filter(Boolean) })
+              setSettings({
+                ...settings,
+                contactNotes: e.target.value.split("\n").filter(Boolean),
+              })
             }
           />
         </label>
@@ -462,7 +601,6 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           Save settings
         </PrimaryButton>
       </div>
-
       <div className="admin-divider" />
 
       <div className="admin-card stack-md">
@@ -551,9 +689,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 >
                   Move down
                 </GhostButton>
-                <GhostButton
-                  onClick={() => setServices(services.filter((_, i) => i !== index))}
-                >
+                <GhostButton onClick={() => setServices(services.filter((_, i) => i !== index))}>
                   Delete
                 </GhostButton>
               </div>
@@ -695,9 +831,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 >
                   Move down
                 </GhostButton>
-                <GhostButton
-                  onClick={() => setProjects(projects.filter((_, i) => i !== index))}
-                >
+                <GhostButton onClick={() => setProjects(projects.filter((_, i) => i !== index))}>
                   Delete
                 </GhostButton>
               </div>

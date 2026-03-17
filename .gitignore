@@ -6,6 +6,8 @@ dist/
 out/
 .env
 .env.*
+!.env.example
+!server/.env.example
 .env.local
 server/.env
 server/uploads/

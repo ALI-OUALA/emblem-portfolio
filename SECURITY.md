@@ -3,7 +3,7 @@
 ## Reporting a Vulnerability
 If you believe you have found a security issue, please report it privately.
 
-Email: security@emblem.studio
+Email: alioualaeddine@gmail.com
 
 Please include:
 - A detailed description of the issue
